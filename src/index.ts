@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 console.log('Web Search MCP Server starting...');
 
+import express from "express";
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { SearchEngine } from './search-engine.js';
 import { EnhancedContentExtractor } from './enhanced-content-extractor.js';
 import { WebSearchToolInput, WebSearchToolOutput, SearchResult } from './types.js';
@@ -13,6 +15,7 @@ class WebSearchMCPServer {
   private server: McpServer;
   private searchEngine: SearchEngine;
   private contentExtractor: EnhancedContentExtractor;
+  private registry: Array<{ description: string, name: string, parameters: any, handler: Function }>;
 
   constructor() {
     this.server = new McpServer({
@@ -22,17 +25,18 @@ class WebSearchMCPServer {
 
     this.searchEngine = new SearchEngine();
     this.contentExtractor = new EnhancedContentExtractor();
-
+    this.registry = []
     this.setupTools();
     this.setupGracefulShutdown();
   }
 
   private setupTools(): void {
     // Register the main web search tool (primary choice for comprehensive searches)
-    this.server.tool(
-      'full-web-search',
-      'Search the web and fetch complete page content from top results. This is the most comprehensive web search tool. It searches the web and then follows the resulting links to extract their full page content, providing the most detailed and complete information available. Use get-web-search-summaries for a lightweight alternative.',
-      {
+    const desc1 = 'Search the web and fetch complete page content from top results. This is the most comprehensive web search tool. It searches the web and then follows the resulting links to extract their full page content, providing the most detailed and complete information available. Use get-web-search-summaries for a lightweight alternative.'
+    const tool1 = {
+      name: 'full-web-search',  
+      description: desc1,
+      parameters: {
         query: z.string().describe('Search query to execute (recommended for comprehensive research)'),
         limit: z.union([z.number(), z.string()]).transform((val) => {
           const num = typeof val === 'string' ? parseInt(val, 10) : val;
@@ -55,7 +59,7 @@ class WebSearchMCPServer {
           return num;
         }).optional().describe('Maximum characters per result content (0 = no limit). Usually not needed - content length is automatically optimized.'),
       },
-      async (args: unknown) => {
+      handler: async (args: unknown) => {
         console.log(`[MCP] Tool call received: full-web-search`);
         console.log(`[MCP] Raw arguments:`, JSON.stringify(args, null, 2));
 
@@ -144,13 +148,21 @@ class WebSearchMCPServer {
           throw error;
         }
       }
+    }
+    this.registry.push(tool1);
+    this.server.tool(
+      tool1.name,
+      tool1.description,
+      tool1.parameters,
+      tool1.handler
     );
 
     // Register the lightweight web search summaries tool (secondary choice for quick results)
-    this.server.tool(
-      'get-web-search-summaries',
-      'Search the web and return only the search result snippets/descriptions without following links to extract full page content. This is a lightweight alternative to full-web-search for when you only need brief search results. For comprehensive information, use full-web-search instead.',
-      {
+    const desc2 = 'Search the web and return only the search result snippets/descriptions without following links to extract full page content. This is a lightweight alternative to full-web-search for when you only need brief search results. For comprehensive information, use full-web-search instead.'
+    const tool2 = {
+      name: 'get-web-search-summaries',  
+      description: desc2,
+      parameters: {
         query: z.string().describe('Search query to execute (lightweight alternative)'),
         limit: z.union([z.number(), z.string()]).transform((val) => {
           const num = typeof val === 'string' ? parseInt(val, 10) : val;
@@ -160,7 +172,7 @@ class WebSearchMCPServer {
           return num;
         }).default(5).describe('Number of search results to return (1-10)'),
       },
-      async (args: unknown) => {
+      handler: async (args: unknown) => {
         console.log(`[MCP] Tool call received: get-web-search-summaries`);
         console.log(`[MCP] Raw arguments:`, JSON.stringify(args, null, 2));
 
@@ -237,13 +249,21 @@ class WebSearchMCPServer {
           throw error;
         }
       }
+    }
+    this.registry.push(tool2);
+    this.server.tool(
+      tool2.name,
+      tool2.description,
+      tool2.parameters,
+      tool2.handler
     );
 
     // Register the single page content extraction tool
-    this.server.tool(
-      'get-single-web-page-content',
-      'Extract and return the full content from a single web page URL. This tool follows a provided URL and extracts the main page content. Useful for getting detailed content from a specific webpage without performing a search.',
-      {
+    const desc3 = 'Extract and return the full content from a single web page URL. This tool follows a provided URL and extracts the main page content. Useful for getting detailed content from a specific webpage without performing a search.';
+    const tool3 = {
+      name: 'get-single-web-page-content',  
+      description: desc3,
+      parameters: {
         url: z.string().url().describe('The URL of the web page to extract content from'),
         maxContentLength: z.union([z.number(), z.string()]).transform((val) => {
           const num = typeof val === 'string' ? parseInt(val, 10) : val;
@@ -253,7 +273,7 @@ class WebSearchMCPServer {
           return num;
         }).optional().describe('Maximum characters for the extracted content (0 = no limit, undefined = use default limit). Usually not needed - content length is automatically optimized.'),
       },
-      async (args: unknown) => {
+      handler: async (args: unknown) => {
         console.log(`[MCP] Tool call received: get-single-web-page-content`);
         console.log(`[MCP] Raw arguments:`, JSON.stringify(args, null, 2));
 
@@ -321,6 +341,13 @@ class WebSearchMCPServer {
           throw error;
         }
       }
+    }
+    this.registry.push(tool3);
+    this.server.tool(
+      tool3.name,
+      tool3.description,
+      tool3.parameters,
+      tool3.handler
     );
   }
 
@@ -520,11 +547,98 @@ class WebSearchMCPServer {
     console.log('Server timestamp:', new Date().toISOString());
     console.log('Waiting for MCP messages...');
   }
+
+  async runHttp(): Promise<void> {
+    const app = express();
+    app.use(express.json());
+
+    let id = 0
+    app.get("/health", (req, res) => {
+      res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
+
+    const toolsList = (res: any) => {
+      console.log(`HTTP request for tool list`);
+      const tools = this.registry.map((t) => {
+        const inputSchema = { type: "object", properties: {}, required: [] }
+        Object.entries(t.parameters).forEach(([key, schema]) => {
+          (inputSchema.properties as any)[key] = zodToJsonSchema(schema as any)
+        })
+        return {
+          name: t.name,
+          description: t.description,
+          inputSchema
+        }
+      })
+      return res.json({ result: { tools } });
+    }
+
+    app.get("/tools", (req, res) => {
+      toolsList(res);
+    })
+
+    // Call any tool
+    app.post("/", async (req, res) => {
+      id++
+      const method = req.body.method;
+      const params = req.body.params;
+      if (!method) {
+        return res.status(400).json({ error: "Missing method in request body" });
+      }
+      if (method === 'initialize') {        
+        return res.json({
+          result:{
+            protocolVersion:"2024-11-05",
+            capabilities:{
+              tools:{
+                listChanged:true
+              },
+            instructions: "web-search provides comprehensive web search capabilities using direct connections."
+          },
+          serverInfo:{
+            name:"WebSearch MCP Server",
+            version:"0.3.1"
+          }
+          },
+            jsonrpc:"2.0",
+            id
+          }
+        )
+      }
+      if (method === 'tools/list') {
+        return toolsList(res);
+      }
+
+      if (method === 'tools/call') {
+        const toolName = params.name;
+        if (!toolName) {
+          return res.status(400).json({ error: "Missing toolName in params" });
+        }
+        const args = params.arguments;
+        console.log(`HTTP request for tool call`);
+        const tool = this.registry.find(t => t.name === toolName)
+        if (!tool) {
+          return res.status(404).json({ error: "Tool not found" });
+        }
+
+        try {
+          const data = await tool.handler(args, { log: console.log })
+          res.json({ result: data});
+        } catch (err: any) {
+          res.status(500).json({ error: err.message });
+        }
+      }
+    });
+
+    app.listen(3001, () => {
+      console.log("HTTP MCP server running on http://localhost:3001");
+    })
+  }
 }
 
 // Start the server
 const server = new WebSearchMCPServer();
-server.run().catch((error: unknown) => {
+server.runHttp().catch((error: unknown) => {
   if (error instanceof Error) {
     console.error('Server error:', error.message);
   } else {
