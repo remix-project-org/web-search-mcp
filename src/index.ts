@@ -2,6 +2,7 @@
 console.log('Web Search MCP Server starting...');
 
 import express, { Request, Response, NextFunction } from "express";
+import { createCorsConfig } from '@remix-endpoints/shared/config'
 import cors from "cors";
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -552,7 +553,7 @@ class WebSearchMCPServer {
   async runHttp(): Promise<void> {
     const app = express();
 
-    app.use(cors());
+    app.use(cors(createCorsConfig()));
 
     app.use(express.json());
 
