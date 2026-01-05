@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 console.log('Web Search MCP Server starting...');
 
-import express, { Request, Response, NextFunction } from "express";
-import { createCorsConfig } from '@remix-endpoints/shared/config'
+import express from "express";
+import { createCorsConfig } from './origins';
 import cors from "cors";
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
