@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 console.log('Web Search MCP Server starting...');
 
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -550,6 +551,9 @@ class WebSearchMCPServer {
 
   async runHttp(): Promise<void> {
     const app = express();
+
+    app.use(cors());
+
     app.use(express.json());
 
     let id = 0
@@ -645,4 +649,4 @@ server.runHttp().catch((error: unknown) => {
     console.error('Server error:', error);
   }
   process.exit(1);
-});
+})
