@@ -1,6 +1,6 @@
 {
   "name": "web-search-mcp-server",
-  "version": "0.3.2-http",
+  "version": "0.3.3-http",
   "description": "MCP server for web search with full page content extraction, search summaries, and single page content extraction",
   "license": "MIT",
   "type": "module",
