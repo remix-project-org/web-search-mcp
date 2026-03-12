@@ -36,7 +36,7 @@ class WebSearchMCPServer {
     // Register the main web search tool (primary choice for comprehensive searches)
     const desc1 = 'Search the web and fetch complete page content from top results. This is the most comprehensive web search tool. It searches the web and then follows the resulting links to extract their full page content, providing the most detailed and complete information available. Use get-web-search-summaries for a lightweight alternative.'
     const tool1 = {
-      name: 'full-web-search',  
+      name: 'full_web_search',  
       description: desc1,
       parameters: {
         query: z.string().describe('Search query to execute (recommended for comprehensive research)'),
@@ -162,7 +162,7 @@ class WebSearchMCPServer {
     // Register the lightweight web search summaries tool (secondary choice for quick results)
     const desc2 = 'Search the web and return only the search result snippets/descriptions without following links to extract full page content. This is a lightweight alternative to full-web-search for when you only need brief search results. For comprehensive information, use full-web-search instead.'
     const tool2 = {
-      name: 'get-web-search-summaries',  
+      name: 'get_web_search_summaries',  
       description: desc2,
       parameters: {
         query: z.string().describe('Search query to execute (lightweight alternative)'),
@@ -263,7 +263,7 @@ class WebSearchMCPServer {
     // Register the single page content extraction tool
     const desc3 = 'Extract and return the full content from a single web page URL. This tool follows a provided URL and extracts the main page content. Useful for getting detailed content from a specific webpage without performing a search.';
     const tool3 = {
-      name: 'get-single-web-page-content',  
+      name: 'get_single_web_page_content',  
       description: desc3,
       parameters: {
         url: z.string().url().describe('The URL of the web page to extract content from'),
